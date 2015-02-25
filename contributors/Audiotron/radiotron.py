@@ -199,7 +199,7 @@ class MyDaemon(Daemon):
 
 			#log.message("=== 0 ===",log.DEBUG)
 			display_mode = radio.getDisplayMode()
-			lcd.setScrollSpeed(0.05) # Scroll speed normal
+			lcd.setScrollSpeed(0.1) # Scroll speed normal
 			ipaddr = exec_cmd('hostname -I')
 
 			# Shutdown command issued
@@ -377,9 +377,9 @@ def tuner_event(event):
 
 def ir_event(ir,lcd,radio,rss,tunerknob):
 	#log.message("------Begin IR event...", log.DEBUG)
-	#log.message(ir, log.DEBUG)
 	action=ir[0]['config']
 	log.message("IR: " + action,log.DEBUG)
+	
 	if (action == "play"):
 		print "play"
 		radio.unmute()
@@ -390,32 +390,60 @@ def ir_event(ir,lcd,radio,rss,tunerknob):
 	elif (action == "volumeup"):
 		print "volume+"
 		volume = radio.increaseVolume()
+		#Detect button Hold
+		while True:
+			ir=pylirc.nextcode(1)
+			if(ir):
+				if(ir[0]['config'] == "volumeup"):
+					volume = radio.increaseVolume()
+					displayVolume(lcd,radio)
+				else:
+					ir_event(ir,lcd,radio,rss,tunerknob)
+					return
+			else:
+				break
 		displayVolume(lcd,radio)
+		time.sleep(0.1)
+		
 	elif (action == "volumedown"):
 		print "volume-"
 		volume = radio.decreaseVolume()
+		#Detect button Hold
+		while True:
+			ir=pylirc.nextcode(1)
+			if(ir):
+				if(ir[0]['config'] == "volumedown"):
+					volume = radio.decreaseVolume()
+					displayVolume(lcd,radio)
+				else:
+					ir_event(ir,lcd,radio,rss,tunerknob)
+					break
+			else:
+				break
 		displayVolume(lcd,radio)
-	elif (action == "next"):
+		time.sleep(0.1)
+	elif (action == "forward"):
 		print "next"
 		radio.channelUp()
-	elif (action == "previous"):
+	elif (action == "rewind"):
 		print "previous"
 		radio.channelDown()
-	elif (action == "iradio") or (action == "eradio"):
+	elif (action == "a") or (action == "c"):
 		print action
 		if(radio.source != radio.RADIO):
 			radio.toggleSource()
 			radio.setReload(True)
 			reload(lcd,radio)
 
-	elif (action == "library"):
+	elif (action == "b"):
 		print "library"
 		if(radio.source != radio.PLAYER):
 			radio.toggleSource()
 			radio.setReload(True)
 			reload(lcd,radio)
 
-	elif (action == "stream"):
+	elif (action == "net"):
+		print action
 		radio.toggleStreaming()
 		if radio.getStreaming():
 			lcd.line2("Streaming on")
@@ -426,11 +454,12 @@ def ir_event(ir,lcd,radio,rss,tunerknob):
 		displayTime(lcd,radio)
 
 	elif (action == "mute"):
+		print action
 		radio.mute()
 
-	elif (action == "ffw"):
+	elif (action == "jumpplus"):
 		print "ffw"
-	elif (action == "rewind"):
+	elif (action == "jumpminus"):
 		print "rewind"
 	#log.message("------End IR Event",log.DEBUG)
 	return
@@ -1047,8 +1076,6 @@ def unmuteRadio(lcd,radio):
 def displayVolume(lcd,radio):
 	volume = radio.getVolume()
 	msg = "Volume " + str(volume)
-	if radio.getStreaming():
-		msg = msg + ' *'
 	lcd.line2(msg)
 	return
 

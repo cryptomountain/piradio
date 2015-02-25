@@ -188,6 +188,11 @@ class MyDaemon(Daemon):
 		count = 0 
 		while True:
 			#log.message("===BEGIN MAIN LOOP===",log.DEBUG)
+			ir=pylirc.nextcode(1)
+			if(ir):
+				ir_event(ir,lcd,radio,rss,tunerknob)
+				ir = []
+			
 			switch = radio.getSwitch()
 			if switch > 0:
 				get_switch_states(lcd,radio,rss,tunerknob)
@@ -257,10 +262,7 @@ class MyDaemon(Daemon):
 				time.sleep(0.75)
 			#log.message("=== 4 ===",log.DEBUG)
 			#time.sleep(0.1)les
-			ir=pylirc.nextcode(1)
-			if(ir):
-				ir_event(ir,lcd,radio,rss,tunerknob)
-				ir = []
+
 			#log.message("===END MAIN LOOP===",log.DEBUG)
 	
 	def status(self):
@@ -323,7 +325,12 @@ def interrupt():
 	switch = radio.getSwitch()
 	if switch > 0:
 		interrupt = get_switch_states(lcd,radio,rss,tunerknob)
-
+	
+	ir=pylirc.nextcode(1)
+	if(ir):
+		ir_event(ir,lcd,radio,rss,tunerknob)
+		return True
+	
 	# Rapid display of timer
 	if radio.getTimer() and not interrupt:
 		displayTime(lcd,radio)

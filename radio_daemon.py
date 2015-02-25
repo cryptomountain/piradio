@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # Raspberry Pi Internet Radio Class
-# $Id: radio_daemon.py,v 1.3 2014/06/08 10:08:07 bob Exp $
+# $Id: radio_daemon.py,v 1.4 2015/01/24 11:46:17 bob Exp $
 # Author : Bob Rathbone
 # Site   : http://www.bobrathbone.com
 #
@@ -22,6 +22,7 @@ class Daemon:
 	
 	Usage: subclass the Daemon class and override the run() method
 	"""
+	#def __init__(self, pidfile, stdin='/dev/null', stdout='/var/log/radio.output', stderr='/var/log/radio.output'):
 	def __init__(self, pidfile, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
 		self.stdin = stdin
 		self.stdout = stdout
@@ -116,10 +117,10 @@ class Daemon:
 
 		# Try killing the daemon process	
 		try:
-			count = 30
+			count = 3
 			while count > 0:
 				os.kill(pid, SIGTERM)
-				time.sleep(0.2)
+				time.sleep(1.0)
 				count -= 1
 			sys.exit(0)
 

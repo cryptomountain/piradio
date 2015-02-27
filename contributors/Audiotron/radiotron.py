@@ -99,7 +99,7 @@ class MyDaemon(Daemon):
 	def run(self):
 		global CurrentFile
 		global ConfigFile
-
+		global tunerknob
 		configOK = False
 		
 		GPIO.setmode(GPIO.BCM)       # Use BCM GPIO numbers
@@ -196,10 +196,12 @@ class MyDaemon(Daemon):
 			switch = radio.getSwitch()
 			if switch > 0:
 				get_switch_states(lcd,radio,rss,tunerknob)
-
+				radio.setSwitch(0)
 			#log.message("=== 0 ===",log.DEBUG)
 			display_mode = radio.getDisplayMode()
-			lcd.setScrollSpeed(0.1) # Scroll speed normal
+			dateFormat = radio.getDateFormat()
+			todaysdate = strftime(dateFormat)
+			lcd.setScrollSpeed(0.3) # Scroll speed normal
 			ipaddr = exec_cmd('hostname -I')
 
 			# Shutdown command issued
@@ -261,7 +263,7 @@ class MyDaemon(Daemon):
 				lcd.line2("Volume " + str(radio.getVolume()))
 				time.sleep(0.75)
 			#log.message("=== 4 ===",log.DEBUG)
-			#time.sleep(0.1)les
+			time.sleep(0.1)
 
 			#log.message("===END MAIN LOOP===",log.DEBUG)
 	
@@ -358,6 +360,8 @@ def switch_event(switch):
 def tuner_event(event):
 	global radio
 	global tunerknob
+	print "Tuner...."
+	log.message("Tuner Event..." + str(event),log.DEBUG)
 	switch = 0
 	ButtonNotPressed = tunerknob.getSwitchState(PUSH_SWITCH)
 
@@ -365,12 +369,15 @@ def tuner_event(event):
 	if ButtonNotPressed:
 		radio.incrementEvent()
 		if event == RotaryEncoder.CLOCKWISE:
-			switch = RIGHT_SWITCH
+			switch = UP_SWITCH
+			print "Up"
 		elif event == RotaryEncoder.ANTICLOCKWISE:
-			switch = LEFT_SWITCH
+			switch = DOWN_SWITCH
+			print "Down"
 
 	if event ==  RotaryEncoder.BUTTONDOWN:
 		switch = MENU_SWITCH
+		print "Menu"
 
 	radio.setSwitch(switch)
 	return
@@ -379,7 +386,8 @@ def ir_event(ir,lcd,radio,rss,tunerknob):
 	#log.message("------Begin IR event...", log.DEBUG)
 	action=ir[0]['config']
 	log.message("IR: " + action,log.DEBUG)
-	
+	option = radio.getOption()
+	interrupt = True
 	if (action == "play"):
 		print "play"
 		radio.unmute()
@@ -429,13 +437,13 @@ def ir_event(ir,lcd,radio,rss,tunerknob):
 		print "previous"
 		radio.channelDown()
 	elif (action == "a") or (action == "c"):
-		print action
+		print "c"
 		if(radio.source != radio.RADIO):
 			radio.toggleSource()
 			radio.setReload(True)
 			reload(lcd,radio)
 
-	elif (action == "b"):
+	elif (action == "b") or (action == "d"):
 		print "library"
 		if(radio.source != radio.PLAYER):
 			radio.toggleSource()
@@ -443,7 +451,8 @@ def ir_event(ir,lcd,radio,rss,tunerknob):
 			reload(lcd,radio)
 
 	elif (action == "net"):
-		print action
+		print "net"
+		log.message("Streaming toggled from IR",log.DEBUG)
 		radio.toggleStreaming()
 		if radio.getStreaming():
 			lcd.line2("Streaming on")
@@ -454,15 +463,50 @@ def ir_event(ir,lcd,radio,rss,tunerknob):
 		displayTime(lcd,radio)
 
 	elif (action == "mute"):
-		print action
+		print "mute"
 		radio.mute()
 
 	elif (action == "jumpplus"):
 		print "ffw"
 	elif (action == "jumpminus"):
 		print "rewind"
+	elif (action == "stop"):
+		print "stop"
+	elif (action == "random"):
+		print "random"
+		radio.setOption(radio.RANDOM)
+		radio.optionChangedTrue()
+		toggle_option(radio,lcd,UP)
+	elif (action == "repeat"):
+		print "repeat"
+		radio.setOption(radio.REPEAT)
+		radio.optionChangedTrue()
+		toggle_option(radio,lcd,UP)
+	elif (action == "power"):
+		print "power"
+	elif (action == "add"):
+		print "add"
+	elif (action == "group"):
+		print "group"
+	elif (action == "addfav"):
+		print "addfav"
+		radio.setDisplayMode(radio.MODE_RSS)
+		display_rss(lcd,rss)
+		interrupt = True
+		
+	elif (action == "title"):
+		print "title"
+	elif (action == "artist"):
+		print "artist"
+	elif (action == "album"):
+		print "album"
+	elif (action == "genre"):
+		print "genre"
+	elif (action == "lists"):
+		print "lists"
+	
 	#log.message("------End IR Event",log.DEBUG)
-	return
+	return interrupt
 
 
 # Check switch states
@@ -470,9 +514,12 @@ def get_switch_states(lcd,radio,rss,tunerknob):
 	#log.message("--Begin Switch states",log.DEBUG)
 	interrupt = False	# Interrupt display
 	switch = radio.getSwitch()
+	
 	pid = exec_cmd("cat /var/run/radiod.pid")
 	display_mode = radio.getDisplayMode()
-	input_source = radio.getSource()	
+	input_source = radio.getSource()
+	events = radio.getEvents()
+	option = radio.getOption()
 	
 	if switch == MENU_SWITCH:
 		log.message("MENU switch mode=" + str(display_mode), log.DEBUG)
@@ -671,12 +718,15 @@ def get_switch_states(lcd,radio,rss,tunerknob):
 	elif switch == STREAM_SWITCH:
 		# TOGGLE STREAM
 		radio.toggleStreaming()
+		print "Stream switch fired..."
+		log.message("Stream switch fired",log.DEBUG)
 		if radio.getStreaming():
 			lcd.line2("Streaming on")
 			time.sleep(2)
 		else:
 			lcd.line2("Streaming off")
 			time.sleep(2)
+		interrupt = True
 		displayTime(lcd,radio)
 
 	# Reset switch and return interrupt
@@ -735,8 +785,12 @@ def toggle_option(radio,lcd,direction):
 	if option == radio.RANDOM:
 		if radio.getRandom():
 			radio.randomOff()
+			lcd.line2("Ramdom off")
+			time.sleep(1)
 		else:
 			radio.randomOn()
+			lcd.line2("Random on")
+			time.sleep(1)
 
 	elif option == radio.CONSUME:
 		if radio.getSource() == radio.PLAYER:
@@ -795,6 +849,8 @@ def toggle_option(radio,lcd,direction):
 			value = 5
  	
 	elif option == radio.STREAMING:
+		print "Stream toggled from option"
+		log.message("Stream toggled from option",log.DEBUG)
 		radio.toggleStreaming()
 
 	elif option == radio.RELOADLIB:
